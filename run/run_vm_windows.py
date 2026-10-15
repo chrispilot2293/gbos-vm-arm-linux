@@ -22,6 +22,19 @@ def find_qemu():
     return qemu
 
 
+def find_firmware(qemu):
+    candidates = [
+        os.path.join(os.path.dirname(qemu), "edk2-aarch64-code.fd"),
+        os.path.join(os.path.dirname(qemu), "share", "qemu", "edk2-aarch64-code.fd"),
+        "/usr/share/qemu/edk2-aarch64-code.fd",
+        "/usr/share/AAVMF/AAVMF_CODE.fd",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("image_dir", nargs="?", default="work/image")
@@ -48,13 +61,23 @@ def main():
         "-smp", str(args.cpus),
         "-m", str(args.memory),
         "-drive", f"file={disk},format=raw,if=virtio",
-        "-device", "virtio-gpu-pci",
+        "-device", "ramfb",
         "-device", "virtio-keyboard-pci",
         "-device", "virtio-mouse-pci",
         "-device", "virtio-net-pci,netdev=net0",
         "-netdev", "user,id=net0",
         "-display", "sdl,gl=off",
     ]
+
+    firmware = find_firmware(qemu)
+    if firmware:
+        cmd += ["-bios", firmware]
+    else:
+        print(
+            "Warning: edk2-aarch64-code.fd was not found beside QEMU. "
+            "The VM may remain at a blank display without ARM64 UEFI firmware.",
+            file=sys.stderr,
+        )
 
     if args.fullscreen:
         cmd += ["-full-screen"]
